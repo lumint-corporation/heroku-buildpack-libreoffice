@@ -45,6 +45,23 @@ echo "-----> LibreOffice: Setting PATH and LD_LIBRARY_PATH"
 PROFILE_PATH="$BUILD_DIR/.profile.d/libreoffice.sh"
 mkdir -p $(dirname $PROFILE_PATH)
 
+# remove vendor docs
+echo "-----> LibreOffice: Remove something"
+echo `ls $BUILD_DIR/vendor/libreoffice/deps`
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/shared/gtk-doc
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/shared/man
+rm -rf $BUILD_DIR/vendor/libreoffice/program/wizards
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/lib/libGL.so.8.0.0
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/share/locale
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/include
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/bin/dbus-daemon
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/bin/xgettext
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/share/bash-completition
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/lib/libGLU.so.1.3.1
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/lib/libGLU.a
+rm -rf $BUILD_DIR/vendor/libreoffice/deps/lib/libGLU.a
+echo "-----> LibreOffice: finish remove"
+
 # add vendor binaries to the path
 echo 'export PATH="$HOME/vendor/libreoffice/program:/app/vendor/libreoffice/deps/bin:$PATH"' >> $PROFILE_PATH
 
