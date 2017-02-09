@@ -19,6 +19,11 @@ DEPS_FILE_NAME=libreoffice${VERSION}_x86-64_deps.tar.gz
 DEPS_BUILDPACK_LIBREOFFICE_PACKAGE=https://s3-eu-west-1.amazonaws.com/libreoffice-heroku-buildpack/${DEPS_FILE_NAME}
 DEPS_ARCHIVE_NAME=app/vendor/libreoffice/deps
 
+# Font URL
+FONT_OCRA_FILE_NAME=OCRA.ttf
+FONT_OCRA_BUILDPACK_LIBREOFFICE_PACKAGE=https://github.com/opensourcedesign/fonts/blob/master/OCRA/${FONT_OCRA_FILE_NAME}?raw=true
+FONT_OCRA_ARCHIVE_NAME=app/vendor/libreoffice/share/fonts/truetype
+
 mkdir -p $CACHE_DIR
 if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
   echo "-----> LibreOffice: Downloading LibreOffice ${VERSION} binaries from ${BUILDPACK_LIBREOFFICE_PACKAGE}"
@@ -28,6 +33,11 @@ fi
 if ! [ -e $CACHE_DIR/$DEPS_FILE_NAME ]; then
   echo "-----> LibreOffice: Downloading LibreOffice dependencies (gettext, dbus, libffi, glib, dbus-glib) from ${DEPS_BUILDPACK_LIBREOFFICE_PACKAGE}"
   curl -L $DEPS_BUILDPACK_LIBREOFFICE_PACKAGE -o $CACHE_DIR/$DEPS_FILE_NAME
+fi
+
+if ! [ -e $CACHE_DIR/$FONT_OCRA_FILE_NAME ]; then
+  echo "-----> Fonts: Get OCRA-Font from ${FONT_OCRA_BUILDPACK_LIBREOFFICE_PACKAGE}"
+  curl -L $FONT_OCRA_BUILDPACK_LIBREOFFICE_PACKAGE -o $CACHE_DIR/$FONT_OCRA_FILE_NAME
 fi
 
 echo "-----> LibreOffice: Extracting LibreOffice ${VERSION} binaries to ${BUILD_DIR}/vendor/libreoffice"
@@ -44,6 +54,9 @@ mv $CACHE_DIR/$DEPS_ARCHIVE_NAME $BUILD_DIR/vendor/libreoffice/deps
 echo "-----> LibreOffice: Setting PATH and LD_LIBRARY_PATH"
 PROFILE_PATH="$BUILD_DIR/.profile.d/libreoffice.sh"
 mkdir -p $(dirname $PROFILE_PATH)
+
+echo "-----> Fonts: Installing fonts in ${DEPS_ARCHIVE_NAME}"
+mv $CACHE_DIR/$FONT_OCRA_FILE_NAME FONT_OCRA_ARCHIVE_NAME
 
 # adding lib symlink
 cd $BUILD_DIR/vendor/libreoffice/deps/lib/
