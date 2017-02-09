@@ -22,7 +22,7 @@ DEPS_ARCHIVE_NAME=app/vendor/libreoffice/deps
 # Font URL
 FONT_OCRA_FILE_NAME=OCRA.ttf
 FONT_OCRA_BUILDPACK_LIBREOFFICE_PACKAGE=https://github.com/opensourcedesign/fonts/blob/master/OCRA/${FONT_OCRA_FILE_NAME}?raw=true
-FONT_OCRA_ARCHIVE_NAME=app/vendor/libreoffice/share/fonts/truetype
+FONT_OCRA_ARCHIVE_NAME=libreoffice/share/fonts/truetype
 
 mkdir -p $CACHE_DIR
 if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
@@ -55,8 +55,8 @@ echo "-----> LibreOffice: Setting PATH and LD_LIBRARY_PATH"
 PROFILE_PATH="$BUILD_DIR/.profile.d/libreoffice.sh"
 mkdir -p $(dirname $PROFILE_PATH)
 
-echo "-----> Fonts: Installing fonts in ${DEPS_ARCHIVE_NAME}"
-mv $CACHE_DIR/$FONT_OCRA_FILE_NAME FONT_OCRA_ARCHIVE_NAME
+echo "-----> Fonts: Installing fonts in ${FONT_OCRA_ARCHIVE_NAME}"
+mv $CACHE_DIR/$FONT_OCRA_FILE_NAME ${BUILD_DIR}/vendor/${FONT_OCRA_ARCHIVE_NAME}
 
 # adding lib symlink
 cd $BUILD_DIR/vendor/libreoffice/deps/lib/
