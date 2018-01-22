@@ -88,3 +88,18 @@ echo 'export PATH="$HOME/vendor/libreoffice/program:/app/vendor/libreoffice/deps
 
 # configure LD_LIBRARY_PATH to include dependencies
 echo 'export LD_LIBRARY_PATH="$HOME/vendor/libreoffice/deps/lib:$LD_LIBRARY_PATH"' >> $PROFILE_PATH
+
+echo "==================================== GENERATE LIBREOFFICE CONFIG ===================================="
+
+# Run soffice with a fake macro so the .config directory is generated
+$BUILD_DIR/vendor/libreoffice/program/soffice --headless --invisible 'macro:///'
+# Move generated .config to the build dir so it's persisted after slug compilation
+LIBREOFFICE_CONFIG_DIR=$BUILD_DIR/.config/libreoffice
+mkdir -p $LIBREOFFICE_CONFIG_DIR
+cp -rf /app/.config/libreoffice/4 $LIBREOFFICE_CONFIG_DIR
+# Copy custom macro
+MACRO_PATH=$BUILD_DIR/misc/libreoffice_macros/Module1.xba
+LIBREOFFICE_MACROS_DIRECTORY=$LIBREOFFICE_CONFIG_DIR/4/user/basic/Standard/
+cp ${MACRO_PATH} ${LIBREOFFICE_MACROS_DIRECTORY}
+
+echo "=================================== DONE ================================"

@@ -135,5 +135,3 @@ cd ${temp_dir}
 # Compress all dependencies
 tar pczf ${DEPS_FILE} ${PREFIX}
 mv ${DEPS_FILE} release/${DEPS_FILE}
-
-echo "=================================== DONE ================================"
