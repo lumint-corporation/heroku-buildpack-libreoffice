@@ -101,6 +101,7 @@ if [ "$LIBREOFFICE_CONFIG_DIR" != "$LIBREOFFICE_SOURCE_CONFIG_DIR" ]; then
   echo "Copying config from $LIBREOFFICE_SOURCE_CONFIG_DIR to $LIBREOFFICE_CONFIG_DIR"
   cp -rf $LIBREOFFICE_SOURCE_CONFIG_DIR $LIBREOFFICE_CONFIG_DIR
 fi
+echo "Copying macro..."
 # Copy custom macro
 MACRO_PATH=$BUILD_DIR/misc/libreoffice_macros/Module1.xba
 LIBREOFFICE_MACROS_DIRECTORY=$LIBREOFFICE_CONFIG_DIR/4/user/basic/Standard/
