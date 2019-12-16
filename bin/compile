@@ -100,7 +100,7 @@ mkdir -p $LIBREOFFICE_CONFIG_DIR
 cp -rf $LIBREOFFICE_SOURCE_CONFIG_DIR $LIBREOFFICE_CONFIG_DIR || true
 echo "Copying macro..."
 # Copy custom macro
-MACRO_PATH=$BUILD_DIR/misc/libreoffice_macros/Module1.xba
+MACRO_PATH=$BUILD_DIR/misc/libreoffice_macros/*
 LIBREOFFICE_MACROS_DIRECTORY=$LIBREOFFICE_CONFIG_DIR/4/user/basic/Standard/
 cp ${MACRO_PATH} ${LIBREOFFICE_MACROS_DIRECTORY}
 
