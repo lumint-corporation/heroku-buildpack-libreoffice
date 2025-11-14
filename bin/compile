@@ -8,16 +8,19 @@ CACHE_DIR=$2
 # config
 VERSION="5.0.2"
 MINOR_VERSION="5.0"
+# Actual version in archive (may include build number like 5.0.2.1)
+DEB_SOURCE_VERSION="5.0.2.1"
 
 # LibreOffice Binaries URL - use official archive since S3 objects no longer exist
 # Official archive URL: https://downloadarchive.documentfoundation.org/libreoffice/old/5.0.2.1/deb/x86_64/
-DEB_DOWNLOAD_URL="https://downloadarchive.documentfoundation.org/libreoffice/old/5.0.2.1/deb/x86_64/LibreOffice_5.0.2.1_Linux_x86-64_deb.tar.gz"
+DEB_DOWNLOAD_URL="https://downloadarchive.documentfoundation.org/libreoffice/old/${DEB_SOURCE_VERSION}/deb/x86_64/LibreOffice_${DEB_SOURCE_VERSION}_Linux_x86-64_deb.tar.gz"
 FILE_NAME=libreoffice${VERSION}_x86-64.tar.gz
 ARCHIVE_NAME=opt/libreoffice${VERSION}
 
-# LibreOffice Dependencies URL - still try S3 first, fallback to building if needed
+# LibreOffice Dependencies
+# Note: Dependencies must be available in build cache from a previous build, or built separately
+# The S3 bucket previously hosting dependencies no longer exists
 DEPS_FILE_NAME=libreoffice${VERSION}_x86-64_deps.tar.gz
-DEPS_BUILDPACK_LIBREOFFICE_PACKAGE=https://s3-eu-west-1.amazonaws.com/libreoffice-heroku-buildpack/${DEPS_FILE_NAME}
 DEPS_ARCHIVE_NAME=app/vendor/libreoffice/deps
 
 # Font URL
@@ -31,18 +34,51 @@ if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
   echo "-----> Source: ${DEB_DOWNLOAD_URL}"
   
   # Download the .deb tar.gz from official archive
-  DEB_TAR_FILE=$CACHE_DIR/LibreOffice_${VERSION}_Linux_x86-64_deb.tar.gz
+  DEB_TAR_FILE=$CACHE_DIR/LibreOffice_${DEB_SOURCE_VERSION}_Linux_x86-64_deb.tar.gz
   curl -L $DEB_DOWNLOAD_URL -o $DEB_TAR_FILE
+  
+  # Validate download succeeded
+  if [ ! -s "$DEB_TAR_FILE" ]; then
+    echo "Error: Failed to download LibreOffice archive from ${DEB_DOWNLOAD_URL}"
+    exit 1
+  fi
   
   # Extract the .deb tar.gz
   DEB_EXTRACT_DIR=$(mktemp -d)
-  tar xzf $DEB_TAR_FILE -C $DEB_EXTRACT_DIR
+  tar xzf $DEB_TAR_FILE -C $DEB_EXTRACT_DIR || {
+    echo "Error: Failed to extract downloaded archive"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  }
+  
   DEB_ARCHIVE_NAME=$(ls $DEB_EXTRACT_DIR | head -1)
+  if [ -z "$DEB_ARCHIVE_NAME" ]; then
+    echo "Error: Could not determine archive name from extracted files"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
   
   # Extract all .deb files
   cd $DEB_EXTRACT_DIR/$DEB_ARCHIVE_NAME
+  if [ ! -d "DEBS" ]; then
+    echo "Error: DEBS directory not found in archive"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
+  
+  # Check if any .deb files exist
+  if ! ls DEBS/*.deb 1> /dev/null 2>&1; then
+    echo "Error: No .deb files found in DEBS directory"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
+  
   for f in DEBS/*.deb; do
-    ar p "$f" data.tar.gz | tar zx
+    ar p "$f" data.tar.gz | tar zx || {
+      echo "Error: Failed to extract .deb file: $f"
+      rm -rf $DEB_EXTRACT_DIR
+      exit 1
+    }
   done
   
   # Create the final tar.gz with opt/libreoffice structure
@@ -56,18 +92,15 @@ if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
   echo "-----> LibreOffice: Successfully extracted and cached LibreOffice binaries"
 fi
 
+# Check if dependencies are available in cache
+# Dependencies must be built separately and cached, or available from a previous build
 if ! [ -e $CACHE_DIR/$DEPS_FILE_NAME ]; then
-  echo "-----> LibreOffice: Downloading LibreOffice dependencies (gettext, dbus, libffi, glib, dbus-glib)"
-  # Try S3 first, but it may not exist
-  if curl -f -L $DEPS_BUILDPACK_LIBREOFFICE_PACKAGE -o $CACHE_DIR/$DEPS_FILE_NAME 2>/dev/null; then
-    echo "-----> Successfully downloaded dependencies from S3"
-  else
-    echo "-----> Warning: S3 dependencies not available. Dependencies may need to be built."
-    echo "-----> Note: This buildpack expects pre-built dependencies. If build fails, dependencies need to be rebuilt."
-    # Create empty deps directory structure as fallback
-    mkdir -p $BUILD_DIR/vendor/libreoffice/deps/lib
-    touch $CACHE_DIR/$DEPS_FILE_NAME  # Mark as "downloaded" to skip retry
-  fi
+  echo "-----> LibreOffice: Dependencies not found in cache"
+  echo "-----> Error: LibreOffice dependencies (${DEPS_FILE_NAME}) are required but not available."
+  echo "-----> Dependencies must be built separately using build/libreoffice.sh and cached,"
+  echo "-----> or provided from a previous build cache."
+  echo "-----> The S3 bucket previously hosting dependencies no longer exists."
+  exit 1
 fi
 
 if ! [ -e $CACHE_DIR/$FONT_OCRA_FILE_NAME ]; then
@@ -83,16 +116,20 @@ mv ${CACHE_DIR}/${ARCHIVE_NAME}/opt/libreoffice${MINOR_VERSION} $BUILD_DIR/vendo
 
 echo "-----> LibreOffice: Extracting LibreOffice dependencies to ${BUILD_DIR}/vendor/libreoffice/deps"
 mkdir -p $CACHE_DIR/$DEPS_ARCHIVE_NAME
-# Only extract if the deps file exists and is not empty
-if [ -s $CACHE_DIR/$DEPS_FILE_NAME ]; then
-  tar xzf $CACHE_DIR/$DEPS_FILE_NAME -C $CACHE_DIR
-  mv $CACHE_DIR/$DEPS_ARCHIVE_NAME $BUILD_DIR/vendor/libreoffice/deps
-else
-  echo "-----> Warning: Dependencies file is missing or empty. Creating minimal deps structure."
-  mkdir -p $BUILD_DIR/vendor/libreoffice/deps/lib
-  # Note: libGL.so.8.0.0 should come from the dependencies, but if deps are missing,
-  # the build will likely fail when trying to run soffice
+
+# Validate dependencies file exists and is not empty
+if [ ! -s $CACHE_DIR/$DEPS_FILE_NAME ]; then
+  echo "Error: Dependencies file exists but is empty or corrupted: ${CACHE_DIR}/${DEPS_FILE_NAME}"
+  exit 1
 fi
+
+# Extract dependencies
+tar xzf $CACHE_DIR/$DEPS_FILE_NAME -C $CACHE_DIR || {
+  echo "Error: Failed to extract dependencies archive"
+  exit 1
+}
+
+mv $CACHE_DIR/$DEPS_ARCHIVE_NAME $BUILD_DIR/vendor/libreoffice/deps
 
 echo "-----> LibreOffice: Setting PATH and LD_LIBRARY_PATH"
 PROFILE_PATH="$BUILD_DIR/.profile.d/libreoffice.sh"
