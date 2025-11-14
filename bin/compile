@@ -8,10 +8,12 @@ CACHE_DIR=$2
 # config
 VERSION="5.0.2"
 MINOR_VERSION="5.0"
+# Actual version in archive (may include build number like 5.0.2.1)
+DEB_SOURCE_VERSION="5.0.2.1"
 
 # LibreOffice Binaries URL - use official archive since S3 objects no longer exist
 # Official archive URL: https://downloadarchive.documentfoundation.org/libreoffice/old/5.0.2.1/deb/x86_64/
-DEB_DOWNLOAD_URL="https://downloadarchive.documentfoundation.org/libreoffice/old/5.0.2.1/deb/x86_64/LibreOffice_5.0.2.1_Linux_x86-64_deb.tar.gz"
+DEB_DOWNLOAD_URL="https://downloadarchive.documentfoundation.org/libreoffice/old/${DEB_SOURCE_VERSION}/deb/x86_64/LibreOffice_${DEB_SOURCE_VERSION}_Linux_x86-64_deb.tar.gz"
 FILE_NAME=libreoffice${VERSION}_x86-64.tar.gz
 ARCHIVE_NAME=opt/libreoffice${VERSION}
 
@@ -31,18 +33,51 @@ if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
   echo "-----> Source: ${DEB_DOWNLOAD_URL}"
   
   # Download the .deb tar.gz from official archive
-  DEB_TAR_FILE=$CACHE_DIR/LibreOffice_${VERSION}_Linux_x86-64_deb.tar.gz
+  DEB_TAR_FILE=$CACHE_DIR/LibreOffice_${DEB_SOURCE_VERSION}_Linux_x86-64_deb.tar.gz
   curl -L $DEB_DOWNLOAD_URL -o $DEB_TAR_FILE
+  
+  # Validate download succeeded
+  if [ ! -s "$DEB_TAR_FILE" ]; then
+    echo "Error: Failed to download LibreOffice archive from ${DEB_DOWNLOAD_URL}"
+    exit 1
+  fi
   
   # Extract the .deb tar.gz
   DEB_EXTRACT_DIR=$(mktemp -d)
-  tar xzf $DEB_TAR_FILE -C $DEB_EXTRACT_DIR
+  tar xzf $DEB_TAR_FILE -C $DEB_EXTRACT_DIR || {
+    echo "Error: Failed to extract downloaded archive"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  }
+  
   DEB_ARCHIVE_NAME=$(ls $DEB_EXTRACT_DIR | head -1)
+  if [ -z "$DEB_ARCHIVE_NAME" ]; then
+    echo "Error: Could not determine archive name from extracted files"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
   
   # Extract all .deb files
   cd $DEB_EXTRACT_DIR/$DEB_ARCHIVE_NAME
+  if [ ! -d "DEBS" ]; then
+    echo "Error: DEBS directory not found in archive"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
+  
+  # Check if any .deb files exist
+  if ! ls DEBS/*.deb 1> /dev/null 2>&1; then
+    echo "Error: No .deb files found in DEBS directory"
+    rm -rf $DEB_EXTRACT_DIR
+    exit 1
+  fi
+  
   for f in DEBS/*.deb; do
-    ar p "$f" data.tar.gz | tar zx
+    ar p "$f" data.tar.gz | tar zx || {
+      echo "Error: Failed to extract .deb file: $f"
+      rm -rf $DEB_EXTRACT_DIR
+      exit 1
+    }
   done
   
   # Create the final tar.gz with opt/libreoffice structure
